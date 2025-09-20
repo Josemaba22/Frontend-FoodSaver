@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FoodSaver - Recetas</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <header>
+        <nav class="navbar">
+            <ul>
+                <li><a href="capture.html" class="nav-link" id="nav-registrar">Registrar</a></li>
+                <li><a href="inventory.html" class="nav-link" id="nav-inventario">Inventario</a></li>
+                <li><a href="recipes.html" class="nav-link" id="nav-recetas">Recetas</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="wrap">
+        <h3>Recetas sugeridas</h3>
+        <div id="recipes"></div>
+        <div style="margin-top:18px">
+            <button class="btn" id="refreshBtn">Pedir nuevas recetas (simular LLM)</button>
+        </div>
+    </main>
+
+    <script>
+        // Detectar la página actual y activar la clase correspondiente
+        const path = window.location.pathname.split("/").pop();
+
+        if (path.includes("capture") || path.includes("manual") || path.includes("confirm")) {
+            document.getElementById("nav-registrar").classList.add("active");
+        } else if (path.includes("inventory")) {
+            document.getElementById("nav-inventario").classList.add("active");
+        } else if (path.includes("recipes")) {
+            document.getElementById("nav-recetas").classList.add("active");
+        }
+
+        const recipesDiv = document.getElementById('recipes');
+        const sampleRecipes = [
+            {
+                title: 'Sándwich de Tomate y Queso',
+                ingredients: ['Tomate', 'Queso', 'Pan'],
+                steps: ['Cortar tomate y queso', 'Colocar en pan', 'Tostar si se desea']
+            },
+            {
+                title: 'Sopa de Cebolla',
+                ingredients: ['Cebolla', 'Caldo', 'Pan'],
+                steps: ['Caramelizar cebolla', 'Agregar caldo y hervir', 'Servir con pan']
+            }
+        ];
+
+        function render(list) {
+            recipesDiv.innerHTML = '';
+            list.forEach(r => {
+                const el = document.createElement('div');
+                el.className = 'recipe';
+                el.innerHTML = `
+      <div class="title">${r.title}</div>
+      <div class="meta">Ingredientes disponibles: ${r.ingredients.join(', ')}</div>
+      <details class="toggle">
+        <summary>Ingredientes</summary>
+        <ul>${r.ingredients.map(i => '<li>' + i + '</li>').join('')}</ul>
+      </details>
+      <details class="toggle">
+        <summary>Instrucciones</summary>
+        <ol>${r.steps.map(s => '<li>' + s + '</li>').join('')}</ol>
+      </details>
+    `;
+                recipesDiv.appendChild(el);
+            });
+        }
+
+        render(sampleRecipes);
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            // Simular pedir al backend -> LLM -> responder
+            alert('Simulación: solicitando recetas al LLM...');
+            render(sampleRecipes); // mismo ejemplo
+        });
+    </script>
+</body>
+
+</html>

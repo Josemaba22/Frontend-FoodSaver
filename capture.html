@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FoodSaver - Capturar Mandado</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <header>
+        <nav class="navbar">
+            <ul>
+                <li><a href="capture.html" class="nav-link" id="nav-registrar">Registrar</a></li>
+                <li><a href="inventory.html" class="nav-link" id="nav-inventario">Inventario</a></li>
+                <li><a href="recipes.html" class="nav-link" id="nav-recetas">Recetas</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        
+        <div class="hero">
+            <h2>Capturar foto del mandado</h2>
+            <p class="muted">Toma una foto de los alimentos sobre la mesa. <br>El modelo propondrá detecciones para confirmar.
+            </p>
+            <div class="preview" id="preview">
+                <video id="video" width="320" height="240" autoplay></video>
+                <canvas id="canvas" width="224" height="224" style="display:none;"></canvas>
+            </div>
+
+            <div class="controls">
+                <button id="snap">CAPTURA FOTO</button>
+            </div>
+
+            <!-- Hidden form for file upload -->
+            <form id="uploadForm" style="display:none;">
+                <input type="file" id="fileInput" name="file" accept="image/*">
+            </form>
+        </div>
+
+        <div id="results" style="margin-top:18px;display:none">
+            <h3>Predicciones</h3>
+            <ul id="predList"></ul>
+            <div style="margin-top:12px">
+                <a class="btn" href="confirm.html">Confirmar detección (ir a modal)</a>
+            </div>
+        </div>
+
+        <!-- Modal de detección -->
+        <div id="detectionModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <h3 class="modal-title">Alimento detectado</h3>
+                    <div class="food-preview">
+                        <div class="food-image">
+                            <img id="capturedImage" src="" alt="Imagen capturada">
+                        </div>
+                        <div class="food-info">
+                            <p><strong>Nombre:</strong> <span id="foodName">Tomate</span></p>
+                            <p><strong>Categoría:</strong> <span id="foodCategory">Vegetales</span></p>
+                            <p><strong>Caducidad:</strong> <span id="foodExpiry">20/09/2025</span></p>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-cancel" id="cancelBtn">Cancelar</button>
+                        <button class="btn btn-edit" id="editBtn">Editar</button>
+                        <button class="btn btn-ok" id="okBtn">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const snapBtn = document.getElementById('snap');
+        const resultsEl = document.getElementById('results');
+        const predList = document.getElementById('predList');
+
+        // Detectar la página actual y activar la clase correspondiente
+        const path = window.location.pathname.split("/").pop();
+
+        if (path.includes("capture") || path.includes("manual") || path.includes("confirm")) {
+            document.getElementById("nav-registrar").classList.add("active");
+        } else if (path.includes("inventory")) {
+            document.getElementById("nav-inventario").classList.add("active");
+        } else if (path.includes("recipes")) {
+            document.getElementById("nav-recetas").classList.add("active");
+        }
+
+        // Access the camera
+        const video = document.getElementById('video');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => { video.srcObject = stream; });
+
+        // Take photo
+        const canvas = document.getElementById('canvas');
+        document.getElementById('snap').onclick = async function () {
+            // Dibujar la imagen en el canvas
+            canvas.getContext('2d').drawImage(video, 0, 0, 224, 224);
+
+            // Mostrar el modal con la imagen capturada
+            const imageDataUrl = canvas.toDataURL('image/jpeg');
+            document.getElementById('capturedImage').src = imageDataUrl;
+            
+            // Mostrar loading en el modal
+            document.getElementById('foodName').textContent = 'Detectando...';
+            document.getElementById('foodCategory').textContent = 'Analizando imagen...';
+            document.getElementById('foodExpiry').textContent = 'Calculando...';
+            
+            // Mostrar el modal
+            document.getElementById('detectionModal').style.display = 'block';
+
+            // Enviar imagen al endpoint de predicción
+            try {
+                canvas.toBlob(async (blob) => {
+                    const formData = new FormData();
+                    formData.append('file', blob, 'capture.jpg');
+
+                    const response = await fetch('http://127.0.0.1:8000/foods/predict-image/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const prediction = await response.json();
+                    
+                    if (prediction.success) {
+                        // Mapear categorías basándose en los alimentos que detecta el modelo
+                        const categoryMap = {
+                            // Frutas
+                            'manzana': 'Frutas',
+                            'banana': 'Frutas',
+                            'uvas': 'Frutas',
+                            'kiwi': 'Frutas',
+                            'limon': 'Frutas',
+                            'mango': 'Frutas',
+                            'naranja': 'Frutas',
+                            'pera': 'Frutas',
+                            'pina': 'Frutas',
+                            'granada': 'Frutas',
+                            'sandia': 'Frutas',
+                            
+                            // Verduras/Vegetales
+                            'remolacha': 'Verduras',
+                            'pimiento': 'Verduras',
+                            'repollo': 'Verduras',
+                            'pimiento_rojo': 'Verduras',
+                            'zanahoria': 'Verduras',
+                            'coliflor': 'Verduras',
+                            'chile': 'Verduras',
+                            'maiz': 'Verduras',
+                            'pepino': 'Verduras',
+                            'berenjena': 'Verduras',
+                            'ajo': 'Verduras',
+                            'jengibre': 'Verduras',
+                            'jalapeno': 'Verduras',
+                            'lechuga': 'Verduras',
+                            'cebolla': 'Verduras',
+                            'paprika': 'Verduras',
+                            'guisantes': 'Verduras',
+                            'papa': 'Verduras',
+                            'rabano': 'Verduras',
+                            'soja': 'Verduras',
+                            'espinaca': 'Verduras',
+                            'maiz_dulce': 'Verduras',
+                            'camote': 'Verduras',
+                            'tomate': 'Verduras',
+                            'nabo': 'Verduras'
+                        };
+
+                        const category = categoryMap[prediction.class_name.toLowerCase()] || 'Verduras';
+                        
+                        // Calcular fecha de caducidad (2 días desde hoy)
+                        const today = new Date();
+                        const expiryDate = new Date(today);
+                        expiryDate.setDate(today.getDate() + 2);
+                        const expiryString = expiryDate.toLocaleDateString('es-ES');
+
+                        // Actualizar la información en el modal con datos reales
+                        document.getElementById('foodName').textContent = prediction.class_name;
+                        document.getElementById('foodCategory').textContent = category;
+                        document.getElementById('foodExpiry').textContent = expiryString;
+                        
+                        console.log('Predicción exitosa:', prediction);
+                    } else {
+                        throw new Error('Predicción fallida');
+                    }
+                }, 'image/jpeg');
+            } catch (error) {
+                console.error('Error en la predicción:', error);
+                
+                // Mostrar datos de ejemplo si falla la predicción
+                const fallbackFood = {
+                    name: 'Alimento no identificado',
+                    category: 'Verduras',
+                    expiry: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toLocaleDateString('es-ES')
+                };
+                
+                document.getElementById('foodName').textContent = fallbackFood.name;
+                document.getElementById('foodCategory').textContent = fallbackFood.category;
+                document.getElementById('foodExpiry').textContent = fallbackFood.expiry;
+                
+                // Mostrar mensaje de error (opcional)
+                alert('No se pudo conectar al servidor de predicción. Mostrando datos de ejemplo.');
+            }
+        };
+
+        fileInput.addEventListener('change', (ev) => {
+            const f = ev.target.files[0];
+            if (!f) return;
+            const url = URL.createObjectURL(f);
+            preview.innerHTML = '<img src="' + url + '" alt="preview">';
+        });
+
+        // Modal functionality
+        const modal = document.getElementById('detectionModal');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const editBtn = document.getElementById('editBtn');
+        const okBtn = document.getElementById('okBtn');
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Cancel button functionality
+        cancelBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        // Edit button functionality
+        editBtn.onclick = function() {
+            // Guardar la imagen capturada en sessionStorage
+            const imageDataUrl = document.getElementById('capturedImage').src;
+            sessionStorage.setItem('capturedImage', imageDataUrl);
+            
+            // Guardar los datos detectados para prellenar el formulario
+            const detectedData = {
+                name: document.getElementById('foodName').textContent,
+                category: document.getElementById('foodCategory').textContent,
+                expiry: document.getElementById('foodExpiry').textContent,
+                expiryDate: document.getElementById('foodExpiry').textContent
+            };
+            sessionStorage.setItem('detectedData', JSON.stringify(detectedData));
+            
+            // Redirigir a manual.html para editar
+            window.location.href = 'manual.html';
+        }
+
+        // OK button functionality
+        okBtn.onclick = async function() {
+            try {
+                // Preparar datos para enviar al endpoint
+                const foodData = {
+                    name: document.getElementById('foodName').textContent,
+                    category_id: document.getElementById('foodCategory').textContent === 'Frutas' ? 2 : 1,
+                    admission_date: new Date().toISOString().slice(0, 10) // Fecha actual en formato YYYY-MM-DD
+                };
+
+                // Enviar al endpoint
+                const response = await fetch('http://127.0.0.1:8000/foods/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(foodData)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Alimento guardado exitosamente:', result);
+                
+                // Mostrar mensaje de éxito
+                alert('¡Alimento guardado exitosamente en el inventario!');
+                
+                // Cerrar modal
+                modal.style.display = 'none';
+                
+                // Redirigir al inventario para ver el alimento agregado
+                window.location.href = 'inventory.html';
+                
+            } catch (error) {
+                console.error('Error al guardar el alimento:', error);
+                alert('Error al guardar el alimento. Por favor intenta nuevamente.');
+            }
+        }
+    </script>
+</body>
+
+</html>

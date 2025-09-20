@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FoodSaver - Confirmar Detección</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+  <header><h2>Confirmación de detección</h2></header>
+
+  <div class="card">
+    <div class="row">
+      <div class="imgBox">
+        <img src="https://via.placeholder.com/140x140.png?text=Tomate" alt="tomate">
+      </div>
+      <div>
+        <h3>Tomate</h3>
+        <p><strong>Categoría:</strong> Verduras</p>
+        <p><strong>Caducidad estimada:</strong> 20/09/2025</p>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;display:flex;gap:12px">
+      <button class="btn btn-edit" id="editBtn">Editar</button>
+      <button class="btn btn-ok" id="okBtn">OK, Guardar</button>
+      <a href="capture.html" style="margin-left:auto;align-self:center;color:#666;text-decoration:none">Volver</a>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('editBtn').addEventListener('click', ()=>{
+  // redirigir a formulario manual con prellenado (simulado)
+  window.location.href = 'manual.html?prefill=Tomate';
+});
+document.getElementById('okBtn').addEventListener('click', ()=>{
+  alert('Datos guardados (simulación). Serás dirigido al inventario.');
+  window.location.href = 'inventory.html';
+});
+</script>
+</body>
+</html>

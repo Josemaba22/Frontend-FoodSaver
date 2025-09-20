@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FoodSaver - Inventario</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <header>
+        <nav class="navbar">
+            <ul>
+                <li><a href="capture.html" class="nav-link" id="nav-registrar">Registrar</a></li>
+                <li><a href="inventory.html" class="nav-link" id="nav-inventario">Inventario</a></li>
+                <li><a href="recipes.html" class="nav-link" id="nav-recetas">Recetas</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="wrap">
+        <h3>Mi despensa</h3>
+        <div class="list" id="list">
+            <!-- elementos generados por JS -->
+        </div>
+    </main>
+
+    <script>
+        // Detectar la página actual y activar la clase correspondiente
+        const path = window.location.pathname.split("/").pop();
+
+        if (path.includes("capture") || path.includes("manual") || path.includes("confirm")) {
+            document.getElementById("nav-registrar").classList.add("active");
+        } else if (path.includes("inventory")) {
+            document.getElementById("nav-inventario").classList.add("active");
+        } else if (path.includes("recipes")) {
+            document.getElementById("nav-recetas").classList.add("active");
+        }
+        
+        // Función para cargar datos del endpoint
+        async function loadInventory() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/foods/all');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const foods = await response.json();
+                displayInventory(foods);
+            } catch (error) {
+                console.error('Error al cargar el inventario:', error);
+                // Mostrar datos de ejemplo si falla la conexión
+                const sample = [
+                    { id: 1, name: 'Tomate', days_left: 2, cat: 'Verduras' },
+                    { id: 2, name: 'Leche', days_left: 1, cat: 'Lácteos' },
+                    { id: 3, name: 'Pan', days_left: 3, cat: 'Panificados' }
+                ];
+                displayInventory(sample);
+                
+                // Mostrar mensaje de error al usuario
+                const list = document.getElementById('list');
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffeaa7; padding: 12px; border-radius: 6px; margin-bottom: 16px; color: #856404;';
+                errorDiv.innerHTML = '⚠️ No se pudo conectar al servidor. Mostrando datos de ejemplo.';
+                list.insertBefore(errorDiv, list.firstChild);
+            }
+        }
+
+        // Función para mostrar el inventario
+        function displayInventory(foods) {
+            const list = document.getElementById('list');
+            list.innerHTML = ''; // Limpiar lista existente
+            
+            if (!foods || foods.length === 0) {
+                list.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">No hay alimentos en el inventario</div>';
+                return;
+            }
+
+            foods.forEach(food => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                
+                // Calcular días restantes basándose en admission_date + 2 días
+                let daysLeft = 'Sin fecha';
+                if (food.admission_date) {
+                    // Calcular fecha de caducidad: admission_date + 2 días
+                    const admissionDate = new Date(food.admission_date);
+                    const expiryDate = new Date(admissionDate);
+                    expiryDate.setDate(admissionDate.getDate() + 3);
+                    
+                    const today = new Date();
+                    const diffTime = expiryDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    daysLeft = diffDays > 0 ? `${diffDays} días restantes` : `Caducado hace ${Math.abs(diffDays)} días`;
+                }
+                
+                // Obtener nombre de categoría de la estructura anidada
+                const categoryName = food.category?.name || 'Sin categoría';
+                
+                div.innerHTML = `
+                    <div class="thumb"><img src="https://via.placeholder.com/64x64.png?text=IMG" alt="" /></div>
+                    <div class="meta">
+                        <div style="font-weight:700">${food.name}</div>
+                        <div class="muted">${categoryName} • ${daysLeft}</div>
+                    </div>
+                    <div><button class="btn" onclick="useItem(${food.id})">Usar</button></div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // Cargar inventario al cargar la página
+        loadInventory();
+
+        function useItem(id) {
+            alert('Marcar como usado (simulado). ID=' + id);
+        }
+    </script>
+</body>
+
+</html>

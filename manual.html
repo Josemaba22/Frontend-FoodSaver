@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FoodSaver - Registrar Manual</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <header>
+        <nav class="navbar">
+            <ul>
+                <li><a href="capture.html" class="nav-link" id="nav-registrar">Registrar</a></li>
+                <li><a href="inventory.html" class="nav-link" id="nav-inventario">Inventario</a></li>
+                <li><a href="recipes.html" class="nav-link" id="nav-recetas">Recetas</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="wrap">
+        <!-- Imagen capturada -->
+        <div id="capturedImageContainer" class="captured-image-container" style="display:none;">
+            <img id="capturedImagePreview" src="" alt="Imagen capturada" class="captured-image">
+        </div>
+        
+        <h3>Agregar alimento</h3>
+        <form id="manualForm">
+            <label>Nombre</label>
+            <input type="text" id="name" placeholder="Ej. Tomate">
+
+            <label>Categoría</label>
+            <select id="category">
+                <option value="1" selected>Verduras</option>
+                <option value="2">Frutas</option>
+                <option value="3">Lácteos</option>
+                <option value="4">Carnes</option>
+            </select>
+
+            <label>Fecha de ingreso</label>
+            <input type="date" id="admission" value="">
+
+            <div class="small">Puedes completar campos y luego guardar. (Simulación en frontend)</div>
+            <button type="button" class="btn" id="saveBtn">Guardar</button>
+            <a href="inventory.html" style="display:inline-block;margin-left:12px;margin-top:16px;color:#14924b">Ir a
+                Inventario</a>
+        </form>
+    </main>
+
+    <script>
+        // Mostrar imagen capturada si está disponible
+        const capturedImageData = sessionStorage.getItem('capturedImage');
+        if (capturedImageData) {
+            document.getElementById('capturedImagePreview').src = capturedImageData;
+            document.getElementById('capturedImageContainer').style.display = 'block';
+        }
+
+        // Prellenar formulario con datos detectados
+        const detectedData = sessionStorage.getItem('detectedData');
+        if (detectedData) {
+            const data = JSON.parse(detectedData);
+            document.getElementById('name').value = data.name;
+            
+            // Mapear categoría a valor del select
+            const categoryMap = {
+                'Frutas': '2',
+                'Verduras': '1',
+                'Vegetales': '1',
+                'Lácteos': '3',
+                'Carnes': '4'
+            };
+            
+            if (categoryMap[data.category]) {
+                document.getElementById('category').value = categoryMap[data.category];
+            } else {
+                // Por defecto usar "Verduras" si no encuentra la categoría
+                document.getElementById('category').value = '1';
+            }
+
+            // Prellenar fecha de ingreso con la fecha actual
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('admission').value = today;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const prefill = urlParams.get('prefill');
+        if (prefill) {
+            document.getElementById('name').value = prefill;
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('admission').value = today;
+        }
+
+        document.getElementById('saveBtn').addEventListener('click', async () => {
+            try {
+                const data = {
+                    name: document.getElementById('name').value,
+                    category_id: parseInt(document.getElementById('category').value),
+                    admission_date: document.getElementById('admission').value
+                };
+
+                // Enviar al endpoint real
+                const response = await fetch('http://127.0.0.1:8000/foods/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Alimento guardado exitosamente:', result);
+                
+                // Mostrar mensaje de éxito
+                alert('¡Alimento guardado exitosamente en el inventario!');
+                
+                // Redirigir al inventario para ver el alimento agregado
+                window.location.href = 'inventory.html';
+                
+            } catch (error) {
+                console.error('Error al guardar el alimento:', error);
+                alert('Error al guardar el alimento. Por favor intenta nuevamente.');
+            }
+        });
+    </script>
+</body>
+
+</html>

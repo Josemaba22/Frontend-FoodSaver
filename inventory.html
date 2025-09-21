@@ -86,7 +86,7 @@
                     // Calcular fecha de caducidad: admission_date + 2 días
                     const admissionDate = new Date(food.admission_date);
                     const expiryDate = new Date(admissionDate);
-                    expiryDate.setDate(admissionDate.getDate() + 3);
+                    expiryDate.setDate(admissionDate.getDate() + 2);
                     
                     const today = new Date();
                     const diffTime = expiryDate - today;
@@ -97,8 +97,15 @@
                 // Obtener nombre de categoría de la estructura anidada
                 const categoryName = food.category?.name || 'Sin categoría';
                 
+                // Crear imagen con fallback local
+                const imageUrl = food.image_url ? `http://127.0.0.1:8000${food.image_url}` : null;
+                const imageHtml = imageUrl 
+                    ? `<img src="${imageUrl}" alt="${food.name}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 6px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                       <div style="width: 64px; height: 64px; background: #f0f0f0; border-radius: 6px; display: none; align-items: center; justify-content: center; font-size: 10px; color: #999;">IMG</div>`
+                    : `<div style="width: 64px; height: 64px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999;">IMG</div>`;
+                
                 div.innerHTML = `
-                    <div class="thumb"><img src="https://via.placeholder.com/64x64.png?text=IMG" alt="" /></div>
+                    <div class="thumb">${imageHtml}</div>
                     <div class="meta">
                         <div style="font-weight:700">${food.name}</div>
                         <div class="muted">${categoryName} • ${daysLeft}</div>

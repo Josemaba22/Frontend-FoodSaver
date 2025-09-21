@@ -259,37 +259,41 @@
         // OK button functionality
         okBtn.onclick = async function() {
             try {
-                // Preparar datos para enviar al endpoint
-                const foodData = {
-                    name: document.getElementById('foodName').textContent,
-                    category_id: document.getElementById('foodCategory').textContent === 'Frutas' ? 2 : 1,
-                    admission_date: new Date().toISOString().slice(0, 10) // Fecha actual en formato YYYY-MM-DD
-                };
-
-                // Enviar al endpoint
-                const response = await fetch('http://127.0.0.1:8000/foods/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(foodData)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                console.log('Alimento guardado exitosamente:', result);
+                // Crear FormData para enviar imagen y datos
+                const formData = new FormData();
                 
-                // Mostrar mensaje de éxito
-                alert('¡Alimento guardado exitosamente en el inventario!');
+                // Agregar campos del formulario
+                formData.append('name', document.getElementById('foodName').textContent);
+                formData.append('category_id', document.getElementById('foodCategory').textContent === 'Frutas' ? '2' : '1');
+                formData.append('admission_date', new Date().toISOString().slice(0, 10));
                 
-                // Cerrar modal
-                modal.style.display = 'none';
-                
-                // Redirigir al inventario para ver el alimento agregado
-                window.location.href = 'inventory.html';
+                // Convertir la imagen del canvas a blob y agregarla
+                canvas.toBlob(async (blob) => {
+                    formData.append('image', blob, 'captured_food.jpg');
+
+                    // Enviar al nuevo endpoint
+                    const response = await fetch('http://127.0.0.1:8000/foods/with-image/', {
+                        method: 'POST',
+                        body: formData // No agregamos Content-Type header, el browser lo maneja automáticamente para FormData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    console.log('Alimento guardado exitosamente:', result);
+                    
+                    // Mostrar mensaje de éxito
+                    alert('¡Alimento guardado exitosamente en el inventario!');
+                    
+                    // Cerrar modal
+                    modal.style.display = 'none';
+                    
+                    // Redirigir al inventario para ver el alimento agregado
+                    window.location.href = 'inventory.html';
+                    
+                }, 'image/jpeg');
                 
             } catch (error) {
                 console.error('Error al guardar el alimento:', error);

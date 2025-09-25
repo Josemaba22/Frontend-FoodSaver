@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>FoodSaver - Recetas</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="config.js"></script>
 </head>
 
 <body>
@@ -20,11 +21,22 @@
     </header>
 
     <main class="wrap">
-        <h3>Recetas sugeridas</h3>
-        <div id="recipes"></div>
-        <div style="margin-top:18px">
-            <button class="btn" id="refreshBtn">Pedir nuevas recetas (simular LLM)</button>
+        <div class="recipes-header">
+            <h2>🍳 Recetas sugeridas</h2>
+            <p class="recipes-subtitle">Recetas personalizadas basadas en los ingredientes de tu inventario</p>
         </div>
+        
+        <div class="recipes-actions">
+            <button class="btn btn-primary" id="refreshBtn">
+                <span class="btn-icon">🤖</span>
+                <span class="btn-text">Generar nuevas recetas con IA</span>
+            </button>
+            <div class="info-text">
+                💡 Las recetas se guardan automáticamente por 24 horas para ahorrar usos de IA
+            </div>
+        </div>
+        
+        <div id="recipes" class="recipes-grid"></div>
     </main>
 
     <script>
@@ -40,46 +52,277 @@
         }
 
         const recipesDiv = document.getElementById('recipes');
+        let currentRecipeData = null;
+
+        // Configuración de caché
+        const CACHE_KEY = 'foodsaver_recipes_cache';
+        const CACHE_EXPIRY_KEY = 'foodsaver_recipes_cache_expiry';
+        const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 horas en millisegundos
+
+        // Función para guardar recetas en caché
+        function saveRecipesToCache(data) {
+            try {
+                const cacheData = {
+                    data: data,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+                localStorage.setItem(CACHE_EXPIRY_KEY, (Date.now() + CACHE_DURATION).toString());
+                console.log('Recetas guardadas en caché');
+            } catch (error) {
+                console.warn('No se pudo guardar en caché:', error);
+            }
+        }
+
+        // Función para cargar recetas desde caché
+        function loadRecipesFromCache() {
+            try {
+                const cacheExpiry = localStorage.getItem(CACHE_EXPIRY_KEY);
+                const now = Date.now();
+                
+                // Verificar si el caché ha expirado
+                if (!cacheExpiry || now > parseInt(cacheExpiry)) {
+                    console.log('Caché expirado');
+                    return null;
+                }
+
+                const cachedData = localStorage.getItem(CACHE_KEY);
+                if (cachedData) {
+                    const parsed = JSON.parse(cachedData);
+                    console.log('Recetas cargadas desde caché');
+                    return parsed.data;
+                }
+            } catch (error) {
+                console.warn('Error al cargar caché:', error);
+            }
+            return null;
+        }
+
+        // Función para limpiar caché
+        function clearRecipesCache() {
+            localStorage.removeItem(CACHE_KEY);
+            localStorage.removeItem(CACHE_EXPIRY_KEY);
+            console.log('Caché de recetas limpiado');
+        }
+
+        // Función para cargar recetas desde el endpoint o caché
+        async function loadRecipes(forceRefresh = false) {
+            // Intentar cargar desde caché primero (si no se fuerza refresh)
+            if (!forceRefresh) {
+                const cachedData = loadRecipesFromCache();
+                if (cachedData) {
+                    currentRecipeData = cachedData;
+                    renderRecipes(cachedData.recipes);
+                    displayAvailableIngredients(cachedData.source_foods);
+                    //displayCacheInfo(true);
+                    return;
+                }
+            }
+
+            // Si no hay caché válido o se fuerza refresh, llamar al API
+            try {
+                displayLoadingState(true);
+                const response = await fetch(getApiUrl('GET_RECIPES_FROM_FOODS'));
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                currentRecipeData = data;
+                
+                // Guardar en caché
+                saveRecipesToCache(data);
+                
+                renderRecipes(data.recipes);
+                displayAvailableIngredients(data.source_foods);
+                displayCacheInfo(false);
+                
+            } catch (error) {
+                console.error('Error al cargar recetas:', error);
+                
+                // Intentar cargar desde caché como fallback
+                const cachedData = loadRecipesFromCache();
+                if (cachedData) {
+                    currentRecipeData = cachedData;
+                    renderRecipes(cachedData.recipes);
+                    displayAvailableIngredients(cachedData.source_foods);
+                    displayCacheInfo(true);
+                    alert('Error al conectar con el servidor. Mostrando recetas guardadas.');
+                } else {
+                    // Mostrar datos de ejemplo como último recurso
+                    renderRecipes(sampleRecipes);
+                    alert('No se pudieron cargar las recetas del servidor y no hay caché disponible. Mostrando ejemplos.');
+                }
+            } finally {
+                displayLoadingState(false);
+            }
+        }
+
+        // Función para mostrar/ocultar estado de carga
+        function displayLoadingState(isLoading) {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const btnIcon = refreshBtn.querySelector('.btn-icon');
+            const btnText = refreshBtn.querySelector('.btn-text');
+            
+            if (isLoading) {
+                btnIcon.textContent = '⏳';
+                btnText.textContent = 'Generando recetas con IA...';
+                refreshBtn.disabled = true;
+            } else {
+                btnIcon.textContent = '🤖';
+                btnText.textContent = 'Generar nuevas recetas con IA';
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Función para mostrar información del caché
+        function displayCacheInfo(fromCache) {
+            const existingInfo = document.querySelector('.cache-info');
+            if (existingInfo) {
+                existingInfo.remove();
+            }
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'cache-info';
+            infoDiv.style.cssText = `
+                background: ${fromCache ? '#e3f2fd' : '#e8f5e8'}; 
+                padding: 8px 12px; 
+                border-radius: 4px; 
+                margin-bottom: 15px; 
+                font-size: 13px; 
+                color: #666;
+                border-left: 3px solid ${fromCache ? '#2196f3' : '#4caf50'};
+            `;
+            
+            if (fromCache) {
+                const cacheData = JSON.parse(localStorage.getItem(CACHE_KEY));
+                const timeAgo = Math.round((Date.now() - cacheData.timestamp) / (1000 * 60));
+                const expiryTime = new Date(parseInt(localStorage.getItem(CACHE_EXPIRY_KEY)));
+                const timeUntilExpiry = Math.round((expiryTime.getTime() - Date.now()) / (1000 * 60));
+                
+                // Formatear tiempo de manera más legible
+                const formatTime = (minutes) => {
+                    if (minutes < 60) return `${minutes} min`;
+                    const hours = Math.round(minutes / 60);
+                    return `${hours} hora${hours !== 1 ? 's' : ''}`;
+                };
+                
+                infoDiv.innerHTML = `📱 Recetas cargadas desde caché local (hace ${formatTime(timeAgo)}) - Expiran en ${formatTime(timeUntilExpiry)}`;
+            } else {
+                infoDiv.innerHTML = `🤖 Recetas generadas con IA - Guardadas en caché por 24 horas`;
+            }
+            
+            recipesDiv.parentNode.insertBefore(infoDiv, recipesDiv);
+        }
+
+        // Función para mostrar ingredientes disponibles
+        function displayAvailableIngredients(sourceFoods) {
+            if (sourceFoods && sourceFoods.length > 0) {
+                const ingredientsText = sourceFoods.map(food => food.name).join(', ');
+                const existingInfo = document.querySelector('.available-ingredients');
+                if (existingInfo) {
+                    existingInfo.remove();
+                }
+                
+                const ingredientsDiv = document.createElement('div');
+                ingredientsDiv.className = 'available-ingredients';
+                ingredientsDiv.style.cssText = 'background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #14924b;';
+                ingredientsDiv.innerHTML = `
+                    <strong>🥬 Ingredientes disponibles en tu inventario:</strong><br>
+                    <span style="color: #666;">${ingredientsText}</span>
+                `;
+                recipesDiv.parentNode.insertBefore(ingredientsDiv, recipesDiv);
+            }
+        }
+
         const sampleRecipes = [
             {
                 title: 'Sándwich de Tomate y Queso',
                 ingredients: ['Tomate', 'Queso', 'Pan'],
-                steps: ['Cortar tomate y queso', 'Colocar en pan', 'Tostar si se desea']
+                instructions: 'Cortar tomate y queso. Colocar en pan. Tostar si se desea.'
             },
             {
                 title: 'Sopa de Cebolla',
                 ingredients: ['Cebolla', 'Caldo', 'Pan'],
-                steps: ['Caramelizar cebolla', 'Agregar caldo y hervir', 'Servir con pan']
+                instructions: 'Caramelizar cebolla. Agregar caldo y hervir. Servir con pan.'
             }
         ];
 
-        function render(list) {
+        function renderRecipes(recipes) {
             recipesDiv.innerHTML = '';
-            list.forEach(r => {
+            
+            if (!recipes || recipes.length === 0) {
+                recipesDiv.innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px; color: #7f8c8d;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🍽️</div>
+                        <h3 style="color: #34495e; margin-bottom: 8px;">No hay recetas disponibles</h3>
+                        <p>Agrega algunos alimentos a tu inventario para generar recetas personalizadas</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            recipes.forEach((r, index) => {
                 const el = document.createElement('div');
                 el.className = 'recipe';
+                el.style.animationDelay = `${index * 0.1}s`;
+                
+                const difficultyLevel = r.ingredients.length <= 3 ? 'Fácil' : r.ingredients.length <= 5 ? 'Intermedio' : 'Avanzado';
+                const timeEstimate = r.ingredients.length <= 3 ? '15 min' : r.ingredients.length <= 5 ? '30 min' : '45 min';
+                
                 el.innerHTML = `
-      <div class="title">${r.title}</div>
-      <div class="meta">Ingredientes disponibles: ${r.ingredients.join(', ')}</div>
-      <details class="toggle">
-        <summary>Ingredientes</summary>
-        <ul>${r.ingredients.map(i => '<li>' + i + '</li>').join('')}</ul>
-      </details>
-      <details class="toggle">
-        <summary>Instrucciones</summary>
-        <ol>${r.steps.map(s => '<li>' + s + '</li>').join('')}</ol>
-      </details>
-    `;
+                    <div class="recipe-header">
+                        <div class="title">${r.title}</div>
+                        <div class="recipe-badges">
+                            <span class="badge badge-difficulty">${difficultyLevel}</span>
+                            <span class="badge badge-time">⏱️ ${timeEstimate}</span>
+                        </div>
+                    </div>
+                    <div class="meta">
+                        <strong>Ingredientes principales:</strong> ${r.ingredients.slice(0, 3).join(', ')}${r.ingredients.length > 3 ? '...' : ''}
+                    </div>
+                    <details class="toggle">
+                        <summary>📝 Lista completa de ingredientes (${r.ingredients.length})</summary>
+                        <ul>${r.ingredients.map(i => `<li>${i}</li>`).join('')}</ul>
+                    </details>
+                    <details class="toggle">
+                        <summary>👨‍🍳 Instrucciones paso a paso</summary>
+                        <div class="instructions">${formatInstructions(r.instructions)}</div>
+                    </details>
+                `;
                 recipesDiv.appendChild(el);
             });
         }
+        
+        function formatInstructions(instructions) {
+            // Dividir por puntos y crear pasos numerados
+            const steps = instructions.split(/\.\s+/).filter(step => step.trim().length > 0);
+            if (steps.length <= 1) {
+                return `<p><strong>1.</strong> ${instructions}</p>`;
+            }
+            
+            return `
+                <div class="recipe-steps">
+                    ${steps.map((step, index) => `
+                        <div class="step-item">
+                            <strong>${index + 1}.</strong> ${step.trim()}${step.endsWith('.') ? '' : '.'}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
 
-        render(sampleRecipes);
+        // Cargar recetas al inicializar la página
+        loadRecipes();
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            // Simular pedir al backend -> LLM -> responder
-            alert('Simulación: solicitando recetas al LLM...');
-            render(sampleRecipes); // mismo ejemplo
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            // Confirmar antes de generar nuevas recetas (consume API key)
+            const confirmed = confirm('¿Generar nuevas recetas? Esto consumirá usos de la API de IA.');
+            if (!confirmed) return;
+            
+            // Limpiar caché y cargar recetas frescas
+            clearRecipesCache();
+            await loadRecipes(true);
         });
     </script>
 </body>

@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>FoodSaver - Inventario</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="config.js"></script>
 </head>
 
 <body>
@@ -41,11 +42,12 @@
         // Función para cargar datos del endpoint
         async function loadInventory() {
             try {
-                const response = await fetch('http://127.0.0.1:8000/foods/all');
+                const response = await fetch(getApiUrl('GET_ALL_FOODS'));
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const foods = await response.json();
+                console.log('Foods data from API:', foods);
                 displayInventory(foods);
             } catch (error) {
                 console.error('Error al cargar el inventario:', error);
@@ -68,6 +70,8 @@
 
         // Función para mostrar el inventario
         function displayInventory(foods) {
+            console.log('CONFIG object:', CONFIG);
+            console.log('API_BASE_URL:', CONFIG.API_BASE_URL);
             const list = document.getElementById('list');
             list.innerHTML = ''; // Limpiar lista existente
             
@@ -98,11 +102,18 @@
                 const categoryName = food.category?.name || 'Sin categoría';
                 
                 // Crear imagen con fallback local
-                const imageUrl = food.image_url ? `http://127.0.0.1:8000${food.image_url}` : null;
+                const imageUrl = food.image_url ? `${CONFIG.API_BASE_URL}${food.image_url}` : null;
+                console.log('Food:', food.name);
+                console.log('  - Raw image_url:', food.image_url);
+                console.log('  - Full image URL:', imageUrl);
+                console.log('  - Admission date:', food.admission_date);
+                
                 const imageHtml = imageUrl 
-                    ? `<img src="${imageUrl}" alt="${food.name}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 6px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                    ? `<img src="${imageUrl}" alt="${food.name}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 6px;" 
+                            onerror="console.error('❌ Error loading image for ${food.name}:', this.src); this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                            onload="console.log('✅ Image loaded successfully for ${food.name}:', this.src);" />
                        <div style="width: 64px; height: 64px; background: #f0f0f0; border-radius: 6px; display: none; align-items: center; justify-content: center; font-size: 10px; color: #999;">IMG</div>`
-                    : `<div style="width: 64px; height: 64px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999;">IMG</div>`;
+                    : `<div style="width: 64px; height: 64px; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999;">SIN IMG</div>`;
                 
                 div.innerHTML = `
                     <div class="thumb">${imageHtml}</div>
@@ -110,7 +121,7 @@
                         <div style="font-weight:700">${food.name}</div>
                         <div class="muted">${categoryName} • ${daysLeft}</div>
                     </div>
-                    <div><button class="btn" onclick="useItem(${food.id})">Usar</button></div>
+                    <div style="margin-left: auto;"><button class="btn" onclick="useItem(${food.id})">Usar</button></div>
                 `;
                 list.appendChild(div);
             });
@@ -119,9 +130,52 @@
         // Cargar inventario al cargar la página
         loadInventory();
 
-        function useItem(id) {
-            alert('Marcar como usado (simulado). ID=' + id);
+        async function useItem(id) {
+            // Confirmar antes de eliminar
+            const confirmed = confirm('¿Estás seguro de que quieres marcar este alimento como usado? Se eliminará del inventario.');
+            if (!confirmed) return;
+
+            try {
+                // Llamar al endpoint DELETE
+                const response = await fetch(`${CONFIG.API_BASE_URL}/foods/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Mostrar mensaje de éxito
+                alert('✅ Alimento marcado como usado y eliminado del inventario.');
+                
+                // Recargar el inventario para mostrar los cambios
+                await loadInventory();
+                
+            } catch (error) {
+                console.error('Error al eliminar el alimento:', error);
+                alert('❌ Error al marcar el alimento como usado. Por favor intenta nuevamente.');
+            }
         }
+
+        // Función de debug para probar URLs de imagen manualmente
+        window.testImageUrl = function(imageUrl) {
+            const img = new Image();
+            img.onload = function() {
+                console.log('✅ URL de imagen accesible:', imageUrl);
+            };
+            img.onerror = function() {
+                console.error('❌ URL de imagen NO accesible:', imageUrl);
+            };
+            img.src = imageUrl;
+        };
+
+        // Función de debug para mostrar info del servidor
+        window.debugServerInfo = function() {
+            console.log('=== DEBUG SERVER INFO ===');
+            console.log('CONFIG.API_BASE_URL:', CONFIG.API_BASE_URL);
+            console.log('Sample image URL test:', CONFIG.API_BASE_URL + '/media/foods/sample.jpg');
+            testImageUrl(CONFIG.API_BASE_URL + '/media/foods/sample.jpg');
+        };
     </script>
 </body>
 

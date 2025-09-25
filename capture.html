@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>FoodSaver - Capturar Mandado</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="config.js"></script>
 </head>
 
 <body>
@@ -32,6 +33,10 @@
 
             <div class="controls">
                 <button id="snap">CAPTURA FOTO</button>
+                <button id="switchCamera" class="btn-secondary">
+                    <span id="cameraIcon">📱</span> 
+                    <span id="cameraLabel">Cámara trasera</span>
+                </button>
             </div>
 
             <!-- Hidden form for file upload -->
@@ -91,10 +96,67 @@
             document.getElementById("nav-recetas").classList.add("active");
         }
 
-        // Access the camera
+        // Access the camera with mobile support
         const video = document.getElementById('video');
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => { video.srcObject = stream; });
+        let currentStream = null;
+        let facingMode = 'environment'; // 'user' for front camera, 'environment' for back camera
+
+        // Function to start camera with specified facing mode
+        async function startCamera(facing = 'environment') {
+            try {
+                // Stop current stream if exists
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+
+                // Camera constraints with mobile support
+                const constraints = {
+                    video: {
+                        facingMode: facing,
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                currentStream = stream;
+                facingMode = facing;
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                // Fallback: try without facingMode constraint
+                try {
+                    const fallbackConstraints = { video: true };
+                    const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                    video.srcObject = stream;
+                    currentStream = stream;
+                } catch (fallbackError) {
+                    console.error('Camera access failed:', fallbackError);
+                    alert('No se pudo acceder a la cámara. Verifica los permisos.');
+                }
+            }
+        }
+
+        // Initialize camera
+        startCamera('environment');
+
+        // Switch camera button
+        document.getElementById('switchCamera').onclick = function() {
+            const newFacing = facingMode === 'environment' ? 'user' : 'environment';
+            startCamera(newFacing);
+            
+            // Update button text and icon
+            const cameraIcon = document.getElementById('cameraIcon');
+            const cameraLabel = document.getElementById('cameraLabel');
+            
+            if (newFacing === 'user') {
+                cameraIcon.textContent = '🤳';
+                cameraLabel.textContent = 'Cámara frontal';
+            } else {
+                cameraIcon.textContent = '📱';
+                cameraLabel.textContent = 'Cámara trasera';
+            }
+        };
 
         // Take photo
         const canvas = document.getElementById('canvas');
@@ -120,7 +182,7 @@
                     const formData = new FormData();
                     formData.append('file', blob, 'capture.jpg');
 
-                    const response = await fetch('http://127.0.0.1:8000/foods/predict-image/', {
+                    const response = await fetch(getApiUrl('PREDICT_IMAGE'), {
                         method: 'POST',
                         body: formData
                     });
@@ -272,7 +334,7 @@
                     formData.append('image', blob, 'captured_food.jpg');
 
                     // Enviar al nuevo endpoint
-                    const response = await fetch('http://127.0.0.1:8000/foods/with-image/', {
+                    const response = await fetch(getApiUrl('SAVE_FOOD_WITH_IMAGE'), {
                         method: 'POST',
                         body: formData // No agregamos Content-Type header, el browser lo maneja automáticamente para FormData
                     });
@@ -300,6 +362,22 @@
                 alert('Error al guardar el alimento. Por favor intenta nuevamente.');
             }
         }
+
+        // Clean up camera stream when leaving the page
+        window.addEventListener('beforeunload', function() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Clean up on page visibility change (mobile)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            } else if (!document.hidden && !currentStream) {
+                startCamera(facingMode);
+            }
+        });
     </script>
 </body>
 

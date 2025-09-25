@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>FoodSaver - Registrar Manual</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="config.js"></script>
 </head>
 
 <body>
@@ -100,7 +101,7 @@
                 };
 
                 // Enviar al endpoint real
-                const response = await fetch('http://127.0.0.1:8000/foods/', {
+                const response = await fetch(getApiUrl('SAVE_FOOD'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -114,6 +115,10 @@
 
                 const result = await response.json();
                 console.log('Alimento guardado exitosamente:', result);
+                
+                // Limpiar sessionStorage
+                sessionStorage.removeItem('capturedImage');
+                sessionStorage.removeItem('detectedData');
                 
                 // Mostrar mensaje de éxito
                 alert('¡Alimento guardado exitosamente en el inventario!');
